@@ -56,6 +56,10 @@ ARG dify_uid=1001
 ARG NODE_MAJOR=22
 ARG NODE_PACKAGE_VERSION=22.21.0-1nodesource1
 ARG NODESOURCE_KEY_FPR=6F71F525282841EEDAF851B42F59B5F99B1BE0B4
+ARG NLTK_DATA_COMMIT=550b6625bcef1f2abff2ff770a5a0d272c9c6b2a
+ARG NLTK_PUNKT_TAB_SHA256=e57f64187974277726a3417ca6f181ec5403676c717672eef6a748a7b20e0106
+ARG NLTK_TAGGER_SHA256=6025f530624335c67d6547d44757b357b4e79bae030a0383e9887a92c1718f0b
+ARG NLTK_STOPWORDS_SHA256=48c0e52d8b52546e827f53761fb30300c0ab94f70660d28bd65ba0a86270946b
 RUN groupadd -r -g ${dify_uid} dify && \
     useradd -r -u ${dify_uid} -g ${dify_uid} -s /bin/bash dify && \
     chown -R dify:dify /app
@@ -67,7 +71,7 @@ RUN \
         curl \
         gnupg \
     && mkdir -p /etc/apt/keyrings \
-    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key -o /tmp/nodesource.gpg \
+    && curl --retry 5 --retry-all-errors --connect-timeout 20 -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key -o /tmp/nodesource.gpg \
     && gpg --show-keys --with-colons /tmp/nodesource.gpg \
         | awk -F: '/^fpr:/ {print $10}' \
         | grep -Fx "${NODESOURCE_KEY_FPR}" \
@@ -98,8 +102,20 @@ ENV VIRTUAL_ENV=/app/api/.venv
 COPY --from=packages --chown=dify:dify ${VIRTUAL_ENV} ${VIRTUAL_ENV}
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
-RUN mkdir -p /usr/local/share/nltk_data \
-    && NLTK_DATA=/usr/local/share/nltk_data python -m nltk.downloader punkt_tab averaged_perceptron_tagger_eng stopwords \
+RUN mkdir -p /usr/local/share/nltk_data/tokenizers /usr/local/share/nltk_data/taggers /usr/local/share/nltk_data/corpora \
+    && curl --retry 5 --retry-all-errors --connect-timeout 20 -fsSL \
+        "https://raw.githubusercontent.com/nltk/nltk_data/${NLTK_DATA_COMMIT}/packages/tokenizers/punkt_tab.zip" -o /tmp/punkt_tab.zip \
+    && echo "${NLTK_PUNKT_TAB_SHA256}  /tmp/punkt_tab.zip" | sha256sum --check - \
+    && python -m zipfile -e /tmp/punkt_tab.zip /usr/local/share/nltk_data/tokenizers \
+    && curl --retry 5 --retry-all-errors --connect-timeout 20 -fsSL \
+        "https://raw.githubusercontent.com/nltk/nltk_data/${NLTK_DATA_COMMIT}/packages/taggers/averaged_perceptron_tagger_eng.zip" -o /tmp/averaged_perceptron_tagger_eng.zip \
+    && echo "${NLTK_TAGGER_SHA256}  /tmp/averaged_perceptron_tagger_eng.zip" | sha256sum --check - \
+    && python -m zipfile -e /tmp/averaged_perceptron_tagger_eng.zip /usr/local/share/nltk_data/taggers \
+    && curl --retry 5 --retry-all-errors --connect-timeout 20 -fsSL \
+        "https://raw.githubusercontent.com/nltk/nltk_data/${NLTK_DATA_COMMIT}/packages/corpora/stopwords.zip" -o /tmp/stopwords.zip \
+    && echo "${NLTK_STOPWORDS_SHA256}  /tmp/stopwords.zip" | sha256sum --check - \
+    && python -m zipfile -e /tmp/stopwords.zip /usr/local/share/nltk_data/corpora \
+    && rm -f /tmp/punkt_tab.zip /tmp/averaged_perceptron_tagger_eng.zip /tmp/stopwords.zip \
     && NLTK_DATA=/usr/local/share/nltk_data python -c "import nltk; nltk.data.find('tokenizers/punkt_tab'); nltk.data.find('taggers/averaged_perceptron_tagger_eng'); nltk.data.find('corpora/stopwords')" \
     && chmod -R 755 /usr/local/share/nltk_data
 
