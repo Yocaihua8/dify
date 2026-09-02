@@ -8,7 +8,12 @@ LABEL maintainer="takatost@gmail.com"
 # if you located in China, you can use taobao registry to speed up
 # RUN npm config set registry https://registry.npmmirror.com
 
-RUN apk add --no-cache tzdata
+RUN set -eu; \
+    for attempt in 1 2 3 4 5; do \
+        if apk add --no-cache tzdata; then exit 0; fi; \
+        if [ "${attempt}" = "5" ]; then exit 1; fi; \
+        sleep 5; \
+    done
 RUN corepack enable
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
