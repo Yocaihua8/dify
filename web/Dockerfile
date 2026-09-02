@@ -41,7 +41,12 @@ RUN set -eu; \
     done
 
 # Install workspace dependencies for the Docker build environment.
-RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN set -eu; \
+    for attempt in 1 2 3 4 5; do \
+        if pnpm install --frozen-lockfile --ignore-scripts; then exit 0; fi; \
+        if [ "${attempt}" = "5" ]; then exit 1; fi; \
+        sleep 5; \
+    done
 
 # build resources
 FROM base AS builder
