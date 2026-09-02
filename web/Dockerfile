@@ -43,7 +43,7 @@ RUN set -eu; \
 # Install workspace dependencies for the Docker build environment.
 RUN set -eu; \
     for attempt in 1 2 3 4 5; do \
-        if pnpm install --frozen-lockfile --ignore-scripts; then exit 0; fi; \
+        if pnpm install --frozen-lockfile --ignore-scripts --no-runtime; then exit 0; fi; \
         if [ "${attempt}" = "5" ]; then exit 1; fi; \
         sleep 5; \
     done
